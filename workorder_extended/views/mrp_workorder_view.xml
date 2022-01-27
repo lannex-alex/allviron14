@@ -1,0 +1,223 @@
+<?xml version="1.0"?>
+<odoo>
+    <record id="mrp_workorder_view_form_tablet_inherit" model="ir.ui.view">
+        <field name="name">mrp.workorder.view.form.inherit.quality.tablet.new.inherit</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp_workorder.mrp_workorder_view_form_tablet"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('o_workorder_data')]/div[hasclass('o_workorder_form')]" position="after">
+                <br/>
+                <div class="container">
+                <div style="background-color: white;" class="pl-3 pt-3">
+                    <div class="o_workorder_bar_content o_workorder_form"
+                         attrs="{'invisible': [('is_last_step', '=', True)]}">
+                        <div class="o_workorder_field" style="color: black;">
+                            <h3 class="text-primary">
+                                <strong>
+                                    Film Specifications
+                                </strong>
+                            </h3>
+                            <div class="d-flex row">
+                                <div class="col-6">
+                                    <div class="o_form_label">Film Width (mm)</div>
+                                    <field name="production_x_studio_film_width_mm" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Film Gusset (mm)</div>
+                                    <field name="production_x_studio_film_gusset_mm" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Bag Width (mm)</div>
+                                    <field name="production_x_studio_bag_width_mm" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                </div>
+                                <div class="col-6">
+                                    <div class="o_form_label">Bag Length (mm)</div>
+                                    <field name="production_x_studio_bag_length_mm" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Film Gauge (um)</div>
+                                    <field name="production_x_studio_film_gauge_um" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Film Colour</div>
+                                    <field name="production_x_studio_film_colour" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Tint</div>
+                                    <field name="production_x_studio_tint" options="{'no_open': True}" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                    <notebook>
+<!--                        <page string="Components" style="background-color: white;"-->
+<!--                              attrs="{'invisible': ['|', ('test_type', 'not in', ('register_byproducts', 'register_consumed_materials')), ('is_last_step', '=', True)]}">-->
+<!--                        </page>-->
+<!--                        <page string="Work Orders" style="background-color: white;"-->
+<!--                              attrs="{'invisible': ['|', ('test_type', 'not in', ('register_byproducts', 'register_consumed_materials')), ('is_last_step', '=', True)]}">-->
+<!--                        </page>-->
+<!--                        <page string="Miscellaneous" style="background-color: white;"-->
+<!--                              attrs="{'invisible': ['|', ('test_type', 'not in', ('register_byproducts', 'register_consumed_materials')), ('is_last_step', '=', True)]}">-->
+<!--                        </page>-->
+
+                        <page string="Product Specs" style="background-color: white;"
+                              attrs="{'invisible': [('is_last_step', '=', True)]}" autofocus="autofocus">
+                            <div class="o_workorder_bar_content o_workorder_form pl-3"
+                                 style="background-color: white;">
+                                <div class="o_workorder_field" style="color: black;">
+                                    <field class="text-center text-success mt-3"
+                                           name="production_x_studio_special_instructions"
+                                           readonly="1"/>
+                                    <br/>
+                                    <br/>
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            Roll Specifications
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Length per Roll (m)</div>
+                                    <field name="production_x_studio_length_per_roll_m" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <br/>
+                                    <br/>
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            Film Qty Calculator
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Kg per 1000 bags</div>
+                                    <field name="production_x_studio_kg_per_1000_bags" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Desired Film Qty</div>
+                                    <field name="production_x_studio_desired_film_qty" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Qty Bags to Produce</div>
+                                    <field name="production_x_studio_qty_bags_to_produce" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Quantity of Bags per Order</div>
+                                    <field name="production_x_studio_qty_bags_to_produce" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <br/>
+                                    <br/>
+                                    <br/>
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            Extrusion Machine Settings
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Extrusion Speed</div>
+                                    <field name="production_x_studio_extrusion_speed" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Line Speed</div>
+                                    <field name="production_x_studio_line_speed" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Air Speed</div>
+                                    <field name="production_x_studio_air_speed" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Output/Hr</div>
+                                    <field name="production_x_studio_outputhr" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                </div>
+                                <div class="o_workorder_field mt-3" style="color: black; margin-bottom: 45px;">
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            MO Specifications
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Client</div>
+                                    <field name="production_x_studio_client" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">PO</div>
+                                    <field name="production_x_studio_po" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Roll Weight</div>
+                                    <field name="production_x_studio_roll_weight_kg" options="{'no_open': True}"
+                                           readonly="1"/><span>KG</span>
+                                    <br/>
+                                    <div class="o_form_label">Bags per (Roll or Crt)</div>
+                                    <field name="production_x_studio_bags_per_roll_or_crt" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Total (Rolls or Crts)</div>
+                                    <field name="production_x_studio_total_rolls_to_produce" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Total Order Quantity</div>
+                                    <field name="production_x_studio_total_order_quantity" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <br/>
+                                    <br/>
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            Printing Specifications
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Printing Plate: <div class="o_field_image o_field_widget" style="width: 100%;"><field name="production_x_studio_printing_plate" widget="image" options="{'size': [120, 120]}"/></div></div>
+                                    <br/>
+                                    <div class="o_form_label">Printing Colour</div>
+                                    <field name="production_x_studio_printing_colour" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Treatment</div>
+                                    <field name="production_x_studio_treatment" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <br/>
+                                    <br/>
+                                    <h3 class="text-primary">
+                                        <strong>
+                                            Conversion Machine Settings
+                                        </strong>
+                                    </h3>
+                                    <div class="o_form_label">Top Temperature</div>
+                                    <field name="production_x_studio_top_temperature" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Bottom Temp</div>
+                                    <field name="production_x_studio_bottom_temp" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Machine Speed</div>
+                                    <field name="production_x_studio_machine_speed" options="{'no_open': True}"
+                                           readonly="1"/>
+                                    <br/>
+                                    <div class="o_form_label">Belt Speed</div>
+                                    <field name="production_x_studio_belt_speed" options="{'no_open': True}"
+                                           readonly="1"/>
+                                </div>
+                            </div>
+                        </page>
+                    </notebook>
+                </div>
+            </xpath>
+            <xpath expr="//div[hasclass('o_workorder_data')]" position="attributes">
+                 <attribute name="class">o_workorder_data overflow-auto</attribute>
+            </xpath>
+        </field>
+    </record>
+    <record id="mrp_workorder_view_form_tablet_hide_button_inherit" model="ir.ui.view">
+        <field name="name">mrp.workorder.view.form.tablet.hide.button.inherit</field>
+        <field name="model">mrp.workorder</field>
+        <field name="inherit_id" ref="mrp_workorder.mrp_workorder_view_form_tablet"/>
+        <field name="arch" type="xml">
+            <xpath expr="//button[@name='action_open_manufacturing_order']" position="attributes">
+                    <attribute name="invisible">1</attribute>
+            </xpath>
+        </field>
+    </record>
+</odoo>
