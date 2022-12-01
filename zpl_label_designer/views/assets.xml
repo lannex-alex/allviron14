@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="assets_backend" name="zpl designer assets" inherit_id="web.assets_backend">
+            <xpath expr="." position="inside">
+                <link rel="stylesheet" href="/zpl_label_designer/static/src/css/label_editor.css"/>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/libs/fabric.min.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/libs/fontfaceobserver.min.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/constants.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/exceptions.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/label_form.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/label_editor_field.js"></script>
+                <script type="text/javascript" src="/zpl_label_designer/static/src/js/label_preview_field.js"></script>
+            </xpath>
+        </template>
+    </data>
+</odoo>
