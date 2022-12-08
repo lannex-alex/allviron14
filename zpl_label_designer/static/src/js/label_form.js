@@ -1,8 +1,6 @@
 odoo.define('zpl_label_designer.LabelView', function (require) {
-  "use strict";
-
-  var core = require('web.core');
-  var qweb = core.qweb;
+  const core = require('web.core');
+  const qweb = core.qweb;
   const rpc = require('web.rpc');
   const _t = core._t;
 
@@ -17,19 +15,16 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
   const LabelFormController = FormController.extend({
     _dropAllowedTypes: ['image/png', 'image/jpeg'],
 
-    init: function (parent, model, renderer, params) {
-      this._super.apply(this, arguments);
+    init: function () {
+      this._super(...arguments);
 
       // Load settings for the label editor
       // TODO: Load only for readonly mode? Move to async method?
       this._loadSettings();
     },
 
-    update: function (params, options) {
-      return this._super.apply(this, arguments).then((res) => {
-        // Reload settings for the label editor
-        return this._loadSettings();
-      });
+    update: function () {
+      return this._super(...arguments).then(() => this._loadSettings());
     },
 
     start: function () {
@@ -40,25 +35,22 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
         this._addDropOverlay();
       }
 
-      // Create functions with attached context 
+      // Create functions with attached context
       this._startFileUploadingCallback = this._startFileUploading.bind(this);
       this._endFileUploadingCallback = this._endFileUploading.bind(this);
       this._dropNewImagesCallback = this._dropNewImages.bind(this);
 
-      return this._super.apply(this, arguments);
+      return this._super(...arguments);
     },
 
-    saveRecord: function (recordID, options) {
-      return this._super.apply(this, arguments).then((res) => {
-        // Reload settings for the label editor
-        return this._loadSettings();
-      });
+    saveRecord: function () {
+      return this._super(...arguments).then(() => this._loadSettings());
     },
 
-    _callButtonAction: function (attrs, record) {
+    _callButtonAction: function (attrs) {
       // TODO: This can (and should) be done like here:
       // https://github.com/OCA/web/tree/15.0/web_ir_actions_act_multi
-      return this._super.apply(this, arguments).then((result) => {
+      return this._super(...arguments).then(() => {
         if (['publish', 'unpublish'].includes(attrs.name)) {
           // this.update({}, { reload: true });
           // Manually reload the view to show different set of buttons
@@ -72,7 +64,7 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
         model: 'zld.label',
         method: 'get_settings',
         args: [[this._get_record_id()]],
-      }).then(settings => {
+      }).then((settings) => {
         this.settings = settings;
 
         // A bit hacky way to pass settings to form fields
@@ -87,12 +79,12 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
         this._disableDragAndDrop();
       }
 
-      return this._super.apply(this, arguments);
+      return this._super(...arguments);
     },
 
     _enableDragAndDrop: function () {
       // Disable any other actions when user dragging files
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
         this._dropArea.addEventListener(eventName, this._preventDefaults, false);
       });
 
@@ -107,7 +99,7 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
     },
 
     _disableDragAndDrop: function () {
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach((eventName) => {
         this._dropArea.removeEventListener(eventName, this._preventDefaults, false);
       });
 
@@ -120,25 +112,25 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
 
     _addDropOverlay: function () {
       // FIXME: Use jQuery but this is not a good solution...
-      const $dropOverlay = $(qweb.render("DropOverlay"));
+      const $dropOverlay = $(qweb.render('DropOverlay'));
 
       this._dropOverlay = $dropOverlay[0];
       this._dropArea.append(this._dropOverlay);
     },
 
     _startFileUploading: function (e) {
-      let dt = e.dataTransfer;
+      const dt = e.dataTransfer;
 
-      if (dt.types.indexOf('Files') != -1) {
+      if (dt.types.indexOf('Files') !== -1) {
         this._showOverlay();
       }
     },
 
     _endFileUploading: function (e) {
-      let dt = e.dataTransfer;
+      const dt = e.dataTransfer;
 
-      if (dt.types.indexOf('Files') != -1) {
-        if (e.target == this._dropOverlay) { // Out of overlay area
+      if (dt.types.indexOf('Files') !== -1) {
+        if (e.target === this._dropOverlay) { // Out of overlay area
           this._hideOverlay();
         }
       }
@@ -147,11 +139,11 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
     _dropNewImages: function (e) {
       const dt = e.dataTransfer;
 
-      if (dt.types.indexOf('Files') != -1) {
+      if (dt.types.indexOf('Files') !== -1) {
         const files = dt.files;
 
         const imageFiles = ([...files]).filter(
-          f => this._dropAllowedTypes.includes(f.type));
+          (f) => this._dropAllowedTypes.includes(f.type));
 
         imageFiles.forEach(this._addNewImage, this);
 
@@ -176,18 +168,19 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
       }
 
       if (file.size > 1 * 1024 * 1024) {
-        return new WarningDialog(
+        new WarningDialog(
           this,
           { title: 'Image is too big' },
-          { message: 'Image is too big. Maximum allowed size is 1 MB' }
+          { message: 'Image is too big. Maximum allowed size is 1 MB' },
         ).open();
+        return;
       }
 
       const filename = file.name;
 
       const reader = new FileReader();
       const that = this;
-      reader.onload = function (file) {
+      reader.onload = function () {
         // TODO: Refactor?
         // Create temp image element
         const previewImage = document.createElement('img');
@@ -201,14 +194,14 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
             body: JSON.stringify({
               name: filename,
               base64: previewImage.src,
-            })
+            }),
           })
-            .then(resp => resp.json())
+            .then((resp) => resp.json())
             .then((data) => {
               if (data.status_code !== 200) {
                 throw new exceptions.ServerError(
                   _t('Something went wrong'),
-                  data.message || constants.SERVER_DOWN_MESSAGE
+                  data.message || constants.SERVER_DOWN_MESSAGE,
                 );
               }
 
@@ -216,11 +209,11 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
 
               fabric.Image.fromURL(
                 `${dataURI}`,
-                (oImg) => { fieldWithCanvas.canvas.add(oImg) },
-                { id: that._generateUniqueID() }
+                (oImg) => { fieldWithCanvas.canvas.add(oImg); },
+                { id: that._generateUniqueID() },
               );
             })
-            .catch(error => {
+            .catch((error) => {
               let title = _t('Something went wrong');
               let message = constants.SERVER_DOWN_MESSAGE;
 
@@ -232,7 +225,7 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
               return new WarningDialog(
                 this,
                 { title: title },
-                { message: message }
+                { message: message },
               ).open();
             });
         };
@@ -252,7 +245,7 @@ odoo.define('zpl_label_designer.LabelView', function (require) {
     _getFieldWidgetWithCanvas: function () {
       // This is a bit hacky but there is no other way to get access to the canvas
       const widgets = this.renderer.allFieldWidgets;
-      return widgets[this.renderer.state.id].filter(w => w.canvas)[0];
+      return widgets[this.renderer.state.id].filter((w) => w.canvas)[0];
     },
 
     _generateUniqueID: () => (new Date()).getTime(),

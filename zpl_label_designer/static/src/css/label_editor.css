@@ -40,37 +40,50 @@ textarea.zpl-preview-content {
 }
 
 /* Canvas */
-.label-container {
+.zld-label-container {
     overflow-x: scroll;
 }
 
 @media (min-width: 576px) {
-    .label-container {
+    .zld-label-container {
         max-width: calc(540px - 32px);
     }
 }
 
 @media (min-width: 768px) {
-    .label-container {
+    .zld-label-container {
         max-width: calc(720px - 32px);
     }
 }
 
 @media (min-width: 992px) {
-    .label-container {
+    .zld-label-container {
         max-width: calc(960px - 32px);
     }
 }
 
 @media (min-width: 1200px) {
-    .label-container {
+    .zld-label-container {
         max-width: calc(1140px - 32px);
     }
 }
 
 @media (min-width: 1534px) {
-    .label-container {
+    .zld-label-container {
         width: 100%;
         max-width: calc(1140px - 32px);
     }
+}
+
+/* Control Panel */
+.zld-control-panel-container {
+    position: fixed !important;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    padding: 15px;
+    width: 200px;
+}
+
+.zld-control-panel-button {
+    cursor: pointer;
 }

@@ -59,7 +59,7 @@
 
                         <div attrs="{'invisible': ['|', '|', ['id', '=', False], ['preview', '=', False], ['preview', '=', '']]}">
                             <group string="Preview">
-                                <div class="label-container">
+                                <div class="zld-label-container">
                                     <field name="preview" nolabel="1" readonly="1" widget="zld_preview" class="w-100" />
                                 </div>
                             </group>

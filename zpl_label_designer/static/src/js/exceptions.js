@@ -1,6 +1,4 @@
-odoo.define('zpl_label_designer.exceptions', function (require) {
-  "use strict";
-
+odoo.define('zpl_label_designer.exceptions', function () {
   class ServerError extends Error {
     constructor(title, message) {
       super(message);
@@ -9,6 +7,6 @@ odoo.define('zpl_label_designer.exceptions', function (require) {
     }
   }
   return {
-    ServerError
+    ServerError,
   };
 });

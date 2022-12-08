@@ -3,27 +3,28 @@
 
 <t t-name="LabelEditor">
     <div class="o_field_label_editor">
-        <div class="label-container">
-            <canvas id="canvas" class="border label-canvas"></canvas>
+        <div class="zld-label-container">
+            <canvas id="zld-canvas" class="border"></canvas>
         </div>
 
-        <div class="control-panel mt-4">
-            <div class="quick-buttons"></div>
+        <div class="zld-control-panel mt-4 d-none">
+            <input type="checkbox" id="zld-show-grid" name="zld-show-grid" />
+            <label for="zld-show-grid">Show grid (each square has a side of approximately 1 mm on printed label)</label>
 
             <hr />
 
-            <div class="default-buttons mb-4">
+            <div class="zld-quick-buttons"></div>
+
+            <hr />
+
+            <div class="zld-default-buttons mb-4">
                 <button type="button" class="btn btn-outline-primary mr-2 mb-2 zld-add-text" data-attribute-name="">Add Custom Text</button>
                 <button type="button" class="btn btn-outline-primary mr-2 mb-2" id="zld-add-rectangle">Add Rectangle</button>
+                <button type="button" class="btn btn-outline-primary mr-2 mb-2" id="zld-add-line">Add Line</button>
 
-                <span class="ml-2 mr-2"> or </span>
+                <span class="ml-2 mr-2"> or select custom field: </span>
 
-                <span class="zld-add-custom-field mb-2">
-                    <select class="o_input o_field_widget col-md-4 mr-2" aria-label="Select custom field to add">
-                        <option value="">Select Custom Field</option>
-                    </select>
-                    <button class="btn btn-primary">Add Custom Field</button>
-                </span>
+                <div class="zld-custom-fields"></div>
             </div>
 
             <p class="notice">
@@ -35,6 +36,53 @@
                 </small>
             </p>
         </div>
+    </div>
+</t>
+
+<t t-name="zpl_label_designer.CustomFieldsWidget">
+    <span class="zld-add-custom-field mb-2">
+        <span class="zld-custom-field-selections">
+            <select class="zpl-custom-field-select o_input o_field_widget col-md-3 mr-2" aria-label="Select custom field to add" data-index="0">
+                <option value="">Select Field</option>
+                <t t-foreach="widget.fields[0]" t-as="field" t-key="field.name">
+                    <option t-att-value="field.name" t-esc="field.label + (field.type == 'many2one' ? ' →' : '')" />
+                </t>
+            </select>
+        </span>
+
+        <button class="btn btn-primary">Add Custom Field</button>
+    </span>
+</t>
+
+<t t-name="zpl_label_designer.ControlPanel">
+    <div t-att-class="'zld-control-panel-container ' + (!widget.visible ? 'o_hidden' : '')" t-att-style="widget.getStyle()">
+        <h3 class="mb-3">Settings</h3>
+
+        <t t-if="widget.groups.length">
+            <div class="zld-control-panel-button-groups"></div>
+        </t>
+        <t t-else="">
+            Not settings available for this object.
+        </t>
+    </div>
+</t>
+
+<t t-name="zpl_label_designer.ControlPanelButton">
+    <span class="zld-control-panel-button mr-2" t-att-data-name="widget.button.name" data-toggle="tooltip" t-att-title="widget.button.tooltip">
+        <t t-if="widget.button.isActive(widget.object)">
+            <img t-att-src="widget.button.image" t-att-alt="widget.button.name" />
+        </t>
+        <t t-else="">
+            <img t-att-src="widget.button.imageInactive" t-att-alt="widget.button.name" />
+        </t>
+    </span>
+</t>
+
+<t t-name="zpl_label_designer.ControlPanelButtonGroup">
+    <div class="zld-control-panel-button-group mb-4">
+        <h4 class="mb-3"><t t-esc="widget.name" /></h4>
+
+        <span class="zld-control-panel-group-buttons"></span>
     </div>
 </t>
 

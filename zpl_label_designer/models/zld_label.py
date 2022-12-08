@@ -67,6 +67,8 @@ class Label(models.Model):
 
     is_published = fields.Boolean(
         string="Is Published?",
+        default=False,
+        copy=False,
     )
 
     is_modified = fields.Boolean(
@@ -76,12 +78,14 @@ class Label(models.Model):
 
     action_report_id = fields.Many2one(
         comodel_name='ir.actions.report',
-        string='Related ir.actions.report ID'
+        string='Related ir.actions.report ID',
+        copy=False,
     )
 
     view_id = fields.Many2one(
         comodel_name='ir.ui.view',
-        string='Related ir.ui.view ID'
+        string='Related ir.ui.view ID',
+        copy=False,
     )
 
     model_id = fields.Many2one(
@@ -89,7 +93,7 @@ class Label(models.Model):
         string='Label Model',
         ondelete='cascade',
         required=True,
-        domain=[("model", "in", Constants.ALLOWED_MODELS)],
+        domain=lambda self: self._get_allowed_models(),
     )
 
     # This is experimental functionality: allow to set custom print report name
@@ -273,52 +277,42 @@ class Label(models.Model):
         for label in self:
             label.is_modified = bool(label.view_id and label.view_id.write_date < label.write_date)
 
-    def _get_allowed_fields(self):
+    def get_allowed_fields(self, model_name=None):
         """
         This method returns list of fields to use in label design (sorted by label)
+        like [{name: ..., label: ..., type: ..., comodel: ...}, ...]
+
+        :param model_name: optional str: 'res.company', 'res.partner', ...
         """
         self.ensure_one()
 
-        if not self.model_id:
+        model_name = model_name or self.model_id.model
+        if not model_name:
             return {}
 
-        model_fields = self.env[self.model_id.model]._fields
+        fields_ = []
 
-        def _is_allowed_field_type(field):
-            return any([isinstance(field, cls) for cls in Constants.ALLOWED_FIELDS])
+        for field_name, field in self.env[model_name]._fields.items():
+            if field_name in Constants.FIELDS_TO_IGNORE or field_name.startswith('_'):
+                continue
 
-        def _prepare_dict_with_allowed_fields(fields_, prefix='', label_prefix='', with_nested=True):  # NOQA
-            """
-            Returns list with allowed fields like pairs [(name, label), ...]
-            """
-            result = []
-            for field_name, field in fields_.items():
-                if field_name in Constants.FIELDS_TO_IGNORE or field_name.startswith('_'):
-                    continue
+            if any([isinstance(field, FieldType) for FieldType in Constants.ALLOWED_FIELDS]):
 
-                if _is_allowed_field_type(field):
-                    if type(field) == fields.Many2one:
-                        if not with_nested:
-                            continue
+                attributes_field = {
+                    'name': field_name,
+                    'label': field.string,
+                    'type': type(field).type,
+                    'comodel': getattr(field, 'comodel_name', False),
+                }
 
-                        comodel = self.env[field.comodel_name]
-                        nested_fields = _prepare_dict_with_allowed_fields(
-                            comodel._fields,
-                            prefix + field_name + '.',
-                            label_prefix + field.string + ' → ',
-                            with_nested=False)
+                # Remove special characters at the beginning of the string from the label
+                # for correct sorting by labels
+                while not attributes_field['label'][0].isalpha():
+                    attributes_field['label'] = attributes_field['label'][1:]
 
-                        result += nested_fields
-                    else:
-                        if label_prefix:
-                            result.append([prefix + field_name, label_prefix + field.string])
-                        else:
-                            result.append([prefix + field_name, field.string])
+                fields_.append(attributes_field)
 
-            return result
-
-        fields_ = _prepare_dict_with_allowed_fields(model_fields)
-        fields_.sort(key=lambda i: i[1])
+        fields_.sort(key=lambda d: d['label'])
 
         return fields_
 
@@ -337,13 +331,15 @@ class Label(models.Model):
         for placeholder in placeholders:
             placeholder_attr = placeholder[2:-2]  # Remove %% from start and end
 
-            # We allow single level of nesting
-            if '.' in placeholder_attr:
-                field, nested_field = placeholder_attr.split('.')
-                nested_model = getattr(random_record, field)
-                placeholder_value = str(getattr(nested_model, nested_field, ''))
-            else:
-                placeholder_value = str(getattr(random_record, placeholder_attr, ''))
+            # Record is object from DB for current placeholder level of nesting
+            # Original level is 0 (record of current model of label)
+            record_for_current_level = random_record
+
+            while '.' in placeholder_attr:
+                field, placeholder_attr = placeholder_attr.split('.', 1)
+                record_for_current_level = getattr(record_for_current_level, field)
+
+            placeholder_value = str(getattr(record_for_current_level, placeholder_attr, ''))
 
             label_preview = label_preview.replace(placeholder, placeholder_value)
 
@@ -361,25 +357,26 @@ class Label(models.Model):
         for placeholder in placeholders:
             placeholder_attr = placeholder[2:-2]  # Remove %% from start and end
 
-            field = placeholder_attr
-            nested_field = None
+            # Starting from level 0 (model of current label)
+            FieldModel = Model
 
-            # We allow single level of nesting
-            if '.' in placeholder_attr:
-                field, nested_field = placeholder_attr.split('.')
+            while '.' in placeholder_attr:
+                field, placeholder_attr = placeholder_attr.split('.', 1)
 
-                if not nested_field:
+                # No nested field name specified
+                if not placeholder_attr:
                     raise exceptions.ValidationError(
                         _('Invalid placeholder: "{}"').format(placeholder))
 
-            if field not in Model._fields:
-                raise exceptions.UserError(
-                    _('Field "{}" does not exist in "{}" model').format(
-                        placeholder_attr, self.model_id.name)
-                )
+                # Field doesn't exist
+                if field not in FieldModel._fields:
+                    raise exceptions.UserError(
+                        _('Field "{}" does not exist in "{}" model').format(
+                            field, FieldModel._description)
+                    )
 
-            if nested_field:
-                if Model._fields[field].type != 'many2one':
+                # Field is not Many2one
+                if FieldModel._fields[field].type != 'many2one':
                     raise exceptions.UserError(
                         _(
                             'Field "{}" is not a many2one field and '
@@ -387,13 +384,14 @@ class Label(models.Model):
                         ).format(field)
                     )
 
-                Comodel = self.env[Model._fields[field].comodel_name]
+                FieldModel = self.env[FieldModel._fields[field].comodel_name]
 
-                if nested_field not in Comodel._fields:
-                    raise exceptions.UserError(
-                        _('Field "{}" does not exist in "{}" relation').format(
-                            nested_field, field)
-                    )
+            # Finally, check if target field exists
+            if placeholder_attr not in FieldModel._fields:
+                raise exceptions.UserError(
+                    _('Field "{}" does not exist in "{}" model').format(
+                        placeholder_attr, FieldModel._name)
+                )
 
         return True
 
@@ -484,6 +482,10 @@ class Label(models.Model):
 
         return {
             'converter_url': self._get_converter_url(),
-            'allowed_fields': self._get_allowed_fields(),
+            'allowed_fields': self.get_allowed_fields(),
             'quick_fields': self._get_quick_fields(),
         }
+
+    def _get_allowed_models(self):
+        allowed_models = [model.model for model in self.env.company.zld_allowed_models]
+        return [("model", "in", allowed_models)] if allowed_models else None

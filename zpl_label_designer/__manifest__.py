@@ -6,7 +6,7 @@
     'summary': """
         Design and publish ZPL labels with easy to use interface.
     """,
-    'version': '14.0.1.0.0',
+    'version': '14.0.1.1.0',
     'category': 'Tools',
     "images": ["static/description/images/banner.gif"],
     'author': 'VentorTech',
@@ -14,13 +14,14 @@
     'support': 'support@ventor.tech',
     'license': 'OPL-1',
     'live_test_url': 'https://odoo.ventor.tech/',
-    'price': 25.00,
+    'price': 49.00,
     'currency': 'EUR',
     'depends': ['base', 'product', 'stock', 'product_expiry'],
     'data': [
         # Data
         'data/ir_config_parameter_data.xml',
         'data/ir_actions_server_data.xml',
+        'data/label_allowed_models.xml',
         # Access rights
         'security/ir.model.access.csv',
         # Assets
@@ -29,6 +30,7 @@
         'views/designer_menus.xml',
         # Views
         'views/label_designer_view.xml',
+        'views/res_config_settings_views.xml',
     ],
     'qweb': [
         'static/src/xml/*.xml',

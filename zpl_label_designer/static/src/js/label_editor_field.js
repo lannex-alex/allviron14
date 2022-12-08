@@ -1,74 +1,67 @@
 odoo.define('zpl_label_designer.LabelEditor', function (require) {
-  "use strict";
-
   const config = require('web.config');
-  const core = require('web.core');
-  const rpc = require('web.rpc');
   const AbstractField = require('web.AbstractField');
   const FieldRegistry = require('web.field_registry');
 
-  const _t = core._t;
-
   const constants = require('zpl_label_designer.constants');
+  const ControlPanelWidget = require('zpl_label_designer.ControlPanel');
+  const CustomFieldsWidget = require('zpl_label_designer.custom_fields_widget');
 
   const LabelEditorField = AbstractField.extend({
     template: 'LabelEditor',
 
-    events: _.extend({}, AbstractField.prototype.events, {}),
+    events: _.extend({}, AbstractField.prototype.events, {
+      'click #zld-show-grid': '_onShowGridClick',
+      'click .zld-add-text': '_onAddTextClick',
+      'click #zld-add-rectangle': '_onAddRectClick',
+      'click #zld-add-line': '_onAddLineClick',
+    }),
     custom_events: _.extend({}, AbstractField.prototype.custom_events, {}),
 
     init: function (parent) {
-      this._super.apply(this, arguments);
+      this._super(...arguments);
 
       // Save form object for later use
       this.parent = parent;
 
+      this.snapLine = null;
+
+      // This variable will be used in grid and snap features
+      this.DPMM = Math.round(this.record.data.dpi / 25.4);
+
       // Do not consider space as a word joiner
       // This way text breaks only when the user types Enter
       fabric.Textbox.prototype._wordJoiners = constants.WORD_JOINERS;
-
-      // TODO: Refactor? Need a better way to hide controls
-      const originalGetVisibility = fabric.Control.prototype.getVisibility;
-      fabric.Control.prototype.getVisibility = function (fabricObject, controlKey) {
-        if (fabricObject.type === 'image' && ['increaseControl', 'decreaseControl', 'fillControl'].includes(controlKey)) {
-          return false;
-        }
-
-        return originalGetVisibility.call(this, fabricObject, controlKey);
-      };
-
-      // Icons for controls
-      this.controlIcons = {};
     },
 
     _renderEdit: function () {
       this._setupEditor();
+      this.el.querySelector('.zld-control-panel').classList.remove('d-none');
     },
 
     _renderReadonly: function () {
       this._setupEditor(true);
-      this.$el.find('.control-panel').hide();
     },
 
     _setupEditor: function (readonly = false) {
       if (!this.record.data.id) {
         // No record yet, do not render anything
-        return;
+        return Promise.resolve();
       }
 
       // Load custom fonts before the canvas initialization
-      const observers = constants.GOOGLE_FONTS.map(font => {
+      const observers = constants.GOOGLE_FONTS.map((font) => {
         const observer = new FontFaceObserver(font[0], font[1]);
         return observer.load();
       });
 
-      Promise.all(observers)
+      return Promise.all(observers)
         .then(() => {
           // Initialize canvas
           const width = this.record.data.width * this.record.data.dpi;
           const height = this.record.data.height * this.record.data.dpi;
 
-          this.canvasEl = this.$el.find('canvas')[0];
+          this.canvasEl = this.el.querySelector('canvas');
 
           this.canvas = new fabric.Canvas(
             this.canvasEl,
@@ -77,10 +70,8 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
               height: height,
               snapThreshold: 45,
               snapAngle: 90,
-            }
+            },
           );
-
-          this._loadControls();
 
           // Load content
           if (this.record.data.blob) {
@@ -89,39 +80,84 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
               this.canvas.forEachObject(function (object) {
                 object.selectable = !readonly;
 
+                // Disable rotation for rects
+                if (object.type === 'rect') {
+                  object.setControlsVisibility({ mtr: false });
+                }
+
                 // Detect if we want to split by spaces. It is used mostly for QR only
-                // object._wordJoiners = object.splitWords ? constants.DEFAULT_WORD_JOINERS : constants.WORD_JOINERS;
+                // object._wordJoiners = object.splitWords
+                //   ? constants.DEFAULT_WORD_JOINERS
+                //   : constants.WORD_JOINERS;
               });
             });
           }
 
           // Load different parts required for editor
           if (!readonly) {
-            this._loadControlIcons();
+            this.controlPanel = new ControlPanelWidget(this, this.canvas);
+            this.controlPanel.appendTo(this.el);
+
             this._addQuickFieldsButtons();
             this._addEvents();
-            this._updateCustomFields();
+            this._addCustomFields();
           }
 
           // Debug logging
           if (config.isDebug()) {
-            console.log(this.canvas);
-            console.log(this.record);
+            console.log(this);
           }
         });
+    },
+
+    _renderGrid: function () {
+      // Remove old lines
+      this._removeGrid();
+
+      for (let i = 1; i < Math.round(this.canvas.width / this.DPMM); i++) {
+        this.canvas.insertAt(
+          new fabric.Line(
+            [i * this.DPMM, 0, i * this.DPMM, this.canvas.height],
+            { type: 'line', stroke: '#eee', strokeWidth: 0.5, selectable: false, class: 'grid' }),
+          0);
+
+        this.canvas.insertAt(
+          new fabric.Line(
+            [0, i * this.DPMM, this.canvas.width, i * this.DPMM],
+            { type: 'line', stroke: '#eee', strokeWidth: 0.5, selectable: false, class: 'grid' }),
+          0);
+      }
+    },
+
+    _removeGrid: function () {
+      if (this.canvas) {
+        this.canvas
+          .getObjects()
+          .filter((o) => o.class === 'grid')
+          .forEach((o) => this.canvas.remove(o));
+      }
+    },
+
+    _updateSnapLine: function (linePoints) {
+      // Remove existing snap line
+      this._resetSnapLine();
+
+      // Add new snap line to canvas
+      this.snapLine = new fabric.Line(linePoints, { class: 'snap', stroke: '#dddddd', strokeWidth: 1 });
+      this.canvas.add(this.snapLine);
     },
 
     _addQuickFieldsButtons: function () {
       const quickFields = this.parent.settings.quick_fields || {};
 
       // Clean buttons container
-      const containerEl = this.el.querySelector('.quick-buttons');
+      const containerEl = this.el.querySelector('.zld-quick-buttons');
       while (containerEl.firstChild) {
         containerEl.removeChild(containerEl.firstChild);
       }
 
       // Add new buttons
-      Object.entries(quickFields).forEach(f => {
+      Object.entries(quickFields).forEach((f) => {
         const [field, value] = f;
         const buttonEl = document.createElement('button');
         buttonEl.innerText = field;
@@ -133,15 +169,6 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
     },
 
     _addEvents: function () {
-      this.el.querySelectorAll('.zld-add-text').forEach(
-        el => el.addEventListener('click', this._addTextboxCallback.bind(this))
-      );
-      this.el.querySelector('#zld-add-rectangle').addEventListener(
-        'click', this._addRectCallback.bind(this));
-
-      this.el.querySelector('.zld-add-custom-field button').addEventListener(
-        'click', this._addCustomFieldCallback.bind(this));
-
       // Listen to keyboard events
       // This is not actually a good option to listen to document events
       // but there is no other way to do it (at least for now)
@@ -157,25 +184,429 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
             this.canvas.remove(activeObject);
             this.canvas.renderAll();
           }
+        } else if (key === 'Escape') {
+          this.controlPanel.hide();
         }
       };
 
-      this.canvas.on("text:changed", this._adjustTextWidth);
-    },
+      this.canvas.on('text:changed', this._onCanvasTextChanged);
+      this.canvas.on('mouse:up', this._onCanvasMouseUp.bind(this));
+      this.canvas.on('object:moving', this._onCanvasObjectMoving.bind(this));
 
-    _updateCustomFields: function () {
-      const fields = this.parent.settings.allowed_fields || [];
-      const selectEl = this.el.querySelector('.zld-add-custom-field select');
+      /*
+       * Control panel events
+      */
+      this.canvas.on('mouse:down', (e) => {
+        // Toggle control panel on next clicks for the same object
+        if (e.target) { // Click on an object
+          const selected = this.canvas.getActiveObject();
 
-      fields.forEach(([key, value]) => {
-        const optionEl = document.createElement('option');
-        optionEl.value = key;
-        optionEl.text = value;
-        selectEl.appendChild(optionEl);
+          if (selected) {
+            if (selected === this.controlPanel.object) {
+              this.controlPanel.toggle();
+            } else {
+              this.controlPanel.update(selected);
+              this.controlPanel.show();
+            }
+          } else {
+            // No object selected
+            this.controlPanel.update(null);
+            this.controlPanel.hide();
+          }
+        } else {
+          // Click on the canvas
+          this.controlPanel.update(null);
+          this.controlPanel.hide();
+        }
+      });
+
+      ['object:moving', 'object:scaling', 'object:rotating', 'object:resizing'].forEach(
+        (event) => this.canvas.on(event, this.controlPanel.hide.bind(this.controlPanel)),
+      );
+
+      setTimeout(() => {
+        // After a second bind scroll event to the o_form_sheet_bg element to hide control panel
+        // when user scrolls the page. This is not a good solution but there is no other way
+        // to do it
+        const contentEl = this.el.closest('.o_content');
+        const formSheetBgEl = this.el.closest('.o_form_sheet_bg');
+
+        // There are multple element to which overflow can be applied (depends on the screen size)
+        // so we need to listen for events for both of them. This is not a good solution but there
+        // is no other way to do it
+        if (contentEl && formSheetBgEl) {
+          contentEl.addEventListener('scroll', this.controlPanel.hide.bind(this.controlPanel));
+          formSheetBgEl.addEventListener('scroll', this.controlPanel.hide.bind(this.controlPanel));
+        }
+      }, 1500);
+
+      this.canvas.on('text:changed', (e) => {
+        this.controlPanel.update(e.target);
       });
     },
 
-    _adjustTextWidth: (e) => {
+    _onCanvasMouseUp: function () {
+      this._resetSnapLine();
+    },
+
+    _onCanvasObjectMoving: function () {
+      const targetObject = this.canvas.getActiveObject();
+      targetObject.setCoords(); // Update object coordinates
+
+      // Remove old snap lines
+      this._resetSnapLine();
+
+      // Do nothing if object rotated
+      if (targetObject.angle !== 0) return;
+
+      // Do nothing if user selects a group of objects
+      if (targetObject.type === 'activeSelection') return;
+
+      this.canvas.forEachObject((object) => {
+        // Skip grid and snap lines
+        if (object.class === 'grid' || object.class === 'snap') return;
+        // Skip self
+        if (object === targetObject) return;
+        // Skip rotated objects
+        if (object.angle !== 0) return;
+
+        const { oCoords } = object;
+        const tCoords = targetObject.oCoords;
+
+        // Horizontal
+        if (Math.abs(tCoords.tl.y - oCoords.tl.y) < this.DPMM) {
+          /*
+                                    Top to top
+          --------- <----> ---------        --------- <----> ---------
+          |       |        |   T   |        |   T   |        |       |
+          |   A   |        ---------   OR   ---------        |   A   |
+          |       |                                          |       |
+          ---------                                          ---------
+          */
+          targetObject.top = object.top;
+
+          // Add snap line
+          if (tCoords.tl.x < oCoords.tl.x) {
+            // active object is to the left
+            this._updateSnapLine([
+              tCoords.tr.x, object.top,
+              oCoords.tl.x, object.top,
+            ]);
+          } else {
+            // active object is to the right
+            this._updateSnapLine([
+              oCoords.tr.x, object.top,
+              tCoords.tl.x, object.top,
+            ]);
+          }
+        } else if (Math.abs(tCoords.tl.y - oCoords.bl.y) < this.DPMM) {
+          /*
+                                  Top to bottom
+                           ---------        ---------
+                           |   T   |        |   T   |
+          --------- <----> ---------        --------- <----> ---------
+          |       |                    OR                    |       |
+          |   A   |                                          |   A   |
+          |       |                                          |       |
+          ---------                                          ---------
+          */
+          targetObject.top = object.top + object.getScaledHeight();
+
+          // Add snap line
+          if (tCoords.tl.x < oCoords.tl.x) {
+            // active object is to the left
+            this._updateSnapLine([
+              tCoords.tr.x, targetObject.top,
+              oCoords.bl.x, targetObject.top,
+            ]);
+          } else {
+            // active object is to the right
+            this._updateSnapLine([
+              oCoords.tr.x, object.top + object.getScaledHeight(),
+              tCoords.tl.x, object.top + object.getScaledHeight(),
+            ]);
+          }
+        } else if (Math.abs(tCoords.bl.y - oCoords.bl.y) < this.DPMM) {
+          /*
+                                Bottom to bottom
+          ---------                                          ---------
+          |       |                                          |       |
+          |   A   |        ---------   OR   ---------        |   A   |
+          |       |        |   T   |        |   T   |        |       |
+          --------- <----> ---------        --------- <----> ---------
+          */
+          targetObject.top = object.top + object.getScaledHeight() - targetObject.getScaledHeight();
+
+          // Add snap line
+          if (tCoords.tl.x < oCoords.tl.x) {
+            // active object is to the left
+            this._updateSnapLine([
+              tCoords.tr.x, object.top + object.getScaledHeight(),
+              oCoords.tl.x, object.top + object.getScaledHeight(),
+            ]);
+          } else {
+            // active object is to the right
+            this._updateSnapLine([
+              oCoords.tr.x, object.top + object.getScaledHeight(),
+              tCoords.tl.x, object.top + object.getScaledHeight(),
+            ]);
+          }
+        } else if (Math.abs(tCoords.bl.y - oCoords.tl.y) < this.DPMM) {
+          /*
+                                  Bottom to top
+          ---------                                          ---------
+          |       |                                          |       |
+          |   A   |                                          |   A   |
+          |       |                    OR                    |       |
+          --------- <----> ---------        --------- <----> ---------
+                           |   T   |        |   T   |
+                           ---------        ---------
+          */
+          targetObject.top = object.top - targetObject.getScaledHeight();
+
+          // Add snap line
+          if (tCoords.tl.x < oCoords.tl.x) {
+            // active object is to the left
+            this._updateSnapLine([
+              tCoords.br.x, targetObject.top + targetObject.getScaledHeight(),
+              oCoords.tl.x, targetObject.top + targetObject.getScaledHeight(),
+            ]);
+          } else {
+            // active object is to the right
+            this._updateSnapLine([
+              oCoords.tr.x, object.top,
+              tCoords.bl.x, object.top,
+            ]);
+          }
+        }
+
+        // Vertical
+        if (Math.abs(tCoords.tl.x - oCoords.tl.x) < this.DPMM) {
+          /*
+              Left to left
+              ---------        ---------
+              |   T   |        |       |
+              ---------        |   A   |
+                               |       |
+              |                ---------
+              |           OR
+                               |
+              ---------        |
+              |       |
+              |   A   |        ---------
+              |       |        |   T   |
+              ---------        ---------
+          */
+          targetObject.left = object.left;
+
+          // Add snap line
+          if (tCoords.tl.y < oCoords.tl.y) {
+            // active object is above
+            this._updateSnapLine([
+              object.left, tCoords.tl.y,
+              object.left, oCoords.bl.y,
+            ]);
+          } else {
+            // active object is below
+            this._updateSnapLine([
+              object.left, oCoords.tl.y,
+              object.left, tCoords.bl.y,
+            ]);
+          }
+        } else if (Math.abs(tCoords.tl.x - oCoords.tr.x) < this.DPMM) {
+          /*
+              Left to right
+              ---------                        ---------
+              |   T   |                        |       |
+              ---------                        |   A   |
+                                               |       |
+                      |                        ---------
+                      |           OR
+                                               |
+                      ---------                |
+                      |       |
+                      |   A   |        ---------
+                      |       |        |   T   |
+                      ---------        ---------
+          */
+          targetObject.left = object.left + object.getScaledWidth();
+
+          // Add snap line
+          if (tCoords.tl.y < oCoords.tl.y) {
+            // active object is above
+            this._updateSnapLine([
+              object.left + object.getScaledWidth(), tCoords.tl.y,
+              object.left + object.getScaledWidth(), oCoords.bl.y,
+            ]);
+          } else {
+            // active object is below
+            this._updateSnapLine([
+              object.left + object.getScaledWidth(), oCoords.tl.y,
+              object.left + object.getScaledWidth(), tCoords.bl.y,
+            ]);
+          }
+        } else if (Math.abs(tCoords.tr.x - oCoords.tr.x) < this.DPMM) {
+          /*
+              Right to right
+              ---------                ---------
+              |   T   |                |       |
+              ---------                |   A   |
+                                       |       |
+                      |                ---------
+                      |     OR
+                                       |
+              ---------                |
+              |       |
+              |   A   |        ---------
+              |       |        |   T   |
+              ---------        ---------
+          */
+          targetObject.left = object.left + object.getScaledWidth() - targetObject.getScaledWidth();
+
+          // Add snap line
+          if (tCoords.tl.y < oCoords.tl.y) {
+            // active object is above
+            this._updateSnapLine([
+              object.left + object.getScaledWidth(), tCoords.tl.y,
+              object.left + object.getScaledWidth(), oCoords.bl.y,
+            ]);
+          } else {
+            // active object is below
+            this._updateSnapLine([
+              object.left + object.getScaledWidth(), oCoords.tl.y,
+              object.left + object.getScaledWidth(), tCoords.bl.y,
+            ]);
+          }
+        } else if (Math.abs(tCoords.tr.x - oCoords.tl.x) < this.DPMM) {
+          /*
+              Right to left
+                      ---------        ---------
+                      |   T   |        |       |
+                      ---------        |   A   |
+                                       |       |
+                      |                ---------
+                      |           OR
+                                               |
+              ---------                        |
+              |       |
+              |   A   |                        ---------
+              |       |                        |   T   |
+              ---------                        ---------
+          */
+          targetObject.left = object.left - targetObject.getScaledWidth();
+
+          // Add snap line
+          if (tCoords.tl.y < oCoords.tl.y) {
+            // active object is above
+            this._updateSnapLine([
+              object.left, tCoords.tl.y,
+              object.left, oCoords.bl.y,
+            ]);
+          } else {
+            // active object is below
+            this._updateSnapLine([
+              object.left, oCoords.tl.y,
+              object.left, tCoords.bl.y,
+            ]);
+          }
+        }
+
+        /*
+                    By center (width)
+            ---------           -------------
+            |       |           |     T     |
+            |   A   |           -------------
+            |       |                 |
+            ---------                 |
+                |         OR          |
+                |                 ---------
+                |                 |       |
+          -------------           |   A   |
+          |     T     |           |       |
+          -------------           ---------
+        */
+        const targetCenterX = tCoords.tl.x + targetObject.getScaledWidth() / 2;
+        const objectCenterX = oCoords.tl.x + object.getScaledWidth() / 2;
+        if (Math.abs(targetCenterX - objectCenterX) < this.DPMM) {
+          // Center to center
+          targetObject.left = object.left
+            + object.getScaledWidth() / 2
+            - targetObject.getScaledWidth() / 2;
+
+          // Add snap line
+          if (tCoords.tl.y < oCoords.tl.y) {
+            // Active object is above
+            this._updateSnapLine([
+              object.left + object.getScaledWidth() / 2, tCoords.tl.y,
+              object.left + object.getScaledWidth() / 2, oCoords.tl.y,
+            ]);
+          } else {
+            // Active object is below
+            this._updateSnapLine([
+              object.left + object.getScaledWidth() / 2, oCoords.bl.y,
+              object.left + object.getScaledWidth() / 2, tCoords.bl.y,
+            ]);
+          }
+        }
+
+        /*
+                                  By center (height)
+            ---------                                          ---------
+            |       |       ---------          ---------       |       |
+            |   A   |  ---  |   T   |    OR    |   T   |  ---  |   A   |
+            |       |       ---------          ---------       |       |
+            ---------                                          ---------
+        */
+        const targetCenterY = tCoords.tl.y + targetObject.getScaledHeight() / 2;
+        const objectCenterY = oCoords.tl.y + object.getScaledHeight() / 2;
+        if (Math.abs(targetCenterY - objectCenterY) < this.DPMM) {
+          // Center to center
+          targetObject.top = object.top
+            + object.getScaledHeight() / 2
+            - targetObject.getScaledHeight() / 2;
+
+          // Add snap line
+          if (tCoords.tl.x < oCoords.tl.x) {
+            // Active object is to the left
+            this._updateSnapLine([
+              tCoords.br.x, object.top + object.getScaledHeight() / 2,
+              oCoords.tl.x, object.top + object.getScaledHeight() / 2,
+            ]);
+          } else {
+            // Active object is to the right
+            this._updateSnapLine([
+              oCoords.tr.x, object.top + object.getScaledHeight() / 2,
+              tCoords.bl.x, object.top + object.getScaledHeight() / 2,
+            ]);
+          }
+        }
+      });
+    },
+
+    _resetSnapLine: function () {
+      if (this.snapLine) {
+        this.canvas.remove(this.snapLine);
+      }
+    },
+
+    _onShowGridClick: function (e) {
+      if (e.target.checked) {
+        this._renderGrid();
+      } else {
+        this._removeGrid();
+      }
+    },
+
+    _addCustomFields: function () {
+      const fields = this.parent.settings.allowed_fields || [];
+
+      // Render widget
+      const customFields = new CustomFieldsWidget(
+        this, fields, this._addCustomFieldCallback.bind(this));
+      customFields.appendTo(this.el.querySelector('.zld-custom-fields'));
+    },
+
+    _onCanvasTextChanged: (e) => {
       const object = e.target;
 
       if (object instanceof fabric.IText) {
@@ -187,16 +618,19 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
     },
 
     commitChanges: function () {
+      // Remove grid lines
+      this._removeGrid();
+
       // Save canvas content only if record exists
       if (this.record.data.id) {
         this._setValue(
           JSON.stringify(this.canvas.toJSON(constants.PROPERTIES_TO_SAVE)),
-          { notify: false }
+          { notify: false },
         );
       }
     },
 
-    _addTextboxCallback: function (e) {
+    _onAddTextClick: function (e) {
       e.preventDefault();
 
       const text = e.target.dataset.value || 'Lorum ipsum';
@@ -207,41 +641,48 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
       this._addTextbox(text, true);
     },
 
-    _addRectCallback: function (e) {
+    _onAddRectClick: function (e) {
       e.preventDefault();
 
       const rect = new fabric.Rect({
         id: this._generateUniqueID(),
         left: 100,
         top: 100,
-        // borderColor: 'black',
         stroke: 'black',
         strokeWidth: 5,
         fill: null,
         width: 50,
         height: 50,
+        snapAngle: 90,
+        snapThreshold: 45,
         noScaleCache: false,
         strokeUniform: true,
       });
 
       // Do not allow to rotate rect
-      rect.setControlsVisibility({
-        mtr: false,
-      });
+      rect.setControlsVisibility({ mtr: false });
 
       this.canvas.add(rect);
     },
 
-    _addCustomFieldCallback: function (e) {
+    _onAddLineClick: function (e) {
       e.preventDefault();
 
-      const value = this.el.querySelector('.zld-add-custom-field select').value;
+      const line = new fabric.Line([100, 100, 200, 100], {
+        id: this._generateUniqueID(),
+        stroke: 'black',
+        strokeWidth: 5,
+        fill: null,
+        noScaleCache: false,
+        strokeUniform: true,
+        snapAngle: 90,
+        snapThreshold: 45,
+      });
 
-      if (!value) {
-        alert(_t('Please select a field to add'));
-        return;
-      }
+      this.canvas.add(line);
+    },
 
+    _addCustomFieldCallback: function (value) {
       this._addTextbox(`%%${value}%%`, true);
     },
 
@@ -264,117 +705,8 @@ odoo.define('zpl_label_designer.LabelEditor', function (require) {
       this.canvas.add(textbox);
     },
 
-    _generateUniqueID: () => {
-      return (new Date()).getTime();
-    },
-
-    _loadControls: function () {
-      // This variable used to add additional space between groups of controls
-      let lastGroup = null;
-      let offsetX = 0;
-
-      constants.TEXT_CONTROLS.forEach((control, i) => {
-        // Add additional offset if group had changed
-        const additionalOffsetX = (!lastGroup || lastGroup === control.group) ? 0 : constants.CONTROL_CORNER_SIZE;
-        offsetX += additionalOffsetX;
-        lastGroup = control.group;
-
-        const props = {
-          x: -0.5,
-          y: -0.5,
-          offsetX: offsetX,
-          offsetY: -(constants.CONTROL_CORNER_SIZE / 2 + 6),
-          cursorStyle: 'pointer',
-          cornerSize: constants.CONTROL_CORNER_SIZE,
-          render: this._renderControlIcon(control),
-          mouseUpHandler: this._getMouseUpHandler(control),
-        };
-
-        fabric.Textbox.prototype.controls[`${control.name}Control`] = new fabric.Control(props);
-
-        // Update offset for the next control
-        offsetX += constants.CONTROL_CORNER_SIZE + 4
-      });
-
-      lastGroup = null;
-      offsetX = 0;
-
-      constants.RECT_CONTROLS.forEach((control, i) => {
-        const additionalOffsetX = (!lastGroup || lastGroup === control.group) ? 0 : constants.CONTROL_CORNER_SIZE;
-        offsetX += additionalOffsetX;
-        lastGroup = control.group;
-
-        const props = {
-          x: -0.5,
-          y: -0.5,
-          offsetX: offsetX,
-          offsetY: -(constants.CONTROL_CORNER_SIZE / 2 + 6),
-          cursorStyle: 'pointer',
-          cornerSize: constants.CONTROL_CORNER_SIZE,
-          render: this._renderControlIcon(control),
-          mouseUpHandler: this._getMouseUpHandler(control),
-        };
-
-        fabric.Rect.prototype.controls[`${control.name}Control`] = new fabric.Control(props);
-
-        // Update offset for the next control
-        offsetX += constants.CONTROL_CORNER_SIZE + 4
-      });
-    },
-
-    _loadControlIcons: function () {
-      /*
-      * Load control icons. We load them once to avoid unnecessary requests
-      */
-      const controls = [].concat(constants.TEXT_CONTROLS, constants.RECT_CONTROLS);
-      controls.forEach((control, i) => {
-        const controlIcon = document.createElement('img');
-        controlIcon.src = control.image;
-
-        const controlIconInactive = document.createElement('img');
-        controlIconInactive.src = control.imageInactive;
-
-        this.controlIcons[control.name] = {
-          active: controlIcon,
-          inactive: controlIconInactive,
-        };
-      });
-    },
-
-    _renderControlIcon: function (control) {
-      return (ctx, left, top, styleOverride, fabricObject) => {
-        /*
-        General method to load icon for any control
-        */
-        ctx.save();
-        ctx.translate(left, top);
-        ctx.rotate(fabric.util.degreesToRadians(fabricObject.angle));
-
-        const state = control.isActive(fabricObject) ? 'active' : 'inactive';
-        const icon = this.controlIcons[control.name][state];
-
-        ctx.drawImage(
-          icon,
-          -constants.CONTROL_CORNER_SIZE / 2, -constants.CONTROL_CORNER_SIZE / 2,
-          constants.CONTROL_CORNER_SIZE, constants.CONTROL_CORNER_SIZE);
-
-        ctx.restore();
-      }
-    },
-
-    _getMouseUpHandler: function (control) {
-      return (eventData, transform) => {
-        const target = transform.target;
-        const canvas = target.canvas;
-
-        if (control.toggle || control.isActive(target)) {
-          control.mouseUpHandlerCallback(target, canvas);
-          canvas.requestRenderAll();
-        }
-      };
-    }
+    _generateUniqueID: () => (new Date()).getTime(),
   });
-
 
   FieldRegistry.add('zld_label_editor', LabelEditorField);
 

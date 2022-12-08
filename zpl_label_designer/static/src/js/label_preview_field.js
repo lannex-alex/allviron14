@@ -1,6 +1,4 @@
 odoo.define('zpl_label_designer.PreviewField', function (require) {
-  "use strict";
-
   const config = require('web.config');
   const core = require('web.core');
   const FieldRegistry = require('web.field_registry');
@@ -8,18 +6,18 @@ odoo.define('zpl_label_designer.PreviewField', function (require) {
   const _t = core._t;
 
   const DENSITY = {
-    '152': '6dpmm',
-    '203': '8dpmm',
-    '300': '12dpmm',
-    '600': '24dpmm',
+    152: '6dpmm',
+    203: '8dpmm',
+    300: '12dpmm',
+    600: '24dpmm',
   };
 
   const PreviewField = FieldText.extend({
-    init: function (parent, name, record, options) {
+    init: function (parent) {
       // Save form object for later use
       this.parent = parent;
 
-      this._super.apply(this, arguments);
+      this._super(...arguments);
     },
 
     _renderZPLContent: function () {
@@ -66,12 +64,12 @@ odoo.define('zpl_label_designer.PreviewField', function (require) {
         const height = this.record.data.height;
         const labelaryUrl = `https://api.labelary.com/v1/printers/${dpmm}/labels/${width}x${height}/0/`;
 
-        let formData = new FormData();
-        formData.append("file", this.record.data.preview);
+        const formData = new FormData();
+        formData.append('file', this.record.data.preview);
 
         fetch(labelaryUrl, { method: 'POST', body: formData })
-          .then(response => response.blob())
-          .then(blob => {
+          .then((response) => response.blob())
+          .then((blob) => {
             const previewURL = URL.createObjectURL(blob);
 
             const imageEl = document.createElement('img');
@@ -82,7 +80,7 @@ odoo.define('zpl_label_designer.PreviewField', function (require) {
           });
         // TODO: Add error catching
       }
-    }
+    },
   });
 
   FieldRegistry.add('zld_preview', PreviewField);

@@ -12,10 +12,6 @@ class Constants:
         'ZPL Converter Server is on maintenance. Try again in a few minutes. '
         'If the issue will not be solved, please, drop us an email at support@ventor.tech')
 
-    ALLOWED_MODELS = [
-        "product.product", "product.template",
-        "stock.production.lot", "stock.quant.package"
-    ]
     ALLOWED_FIELDS = [
         fields.Char, fields.Text,
         fields.Integer, fields.Float,
@@ -57,3 +53,8 @@ class Constants:
         '<': '&lt;',
         '>': '&gt;',
     }
+
+    ALLOWED_MODELS_TO_ZLD_LABEL = [
+        "product.product", "product.template",
+        "stock.production.lot", "stock.quant.package"
+    ]
